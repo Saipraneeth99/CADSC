@@ -32,3 +32,7 @@ INFO:werkzeug: * Detected change in '/home/saipraneeth/Desktop/application/mongo
 2020-08-28 13:23:36,463:WARNING: * Debugger is active!
 2020-08-28 13:23:36,464:INFO: * Debugger PIN: 314-854-231
 2020-08-28 13:23:39,424:INFO:127.0.0.1 - - [28/Aug/2020 13:23:39] "[37mPOST /login HTTP/1.1[0m" 200 -
+2020-08-28 15:57:36,395:INFO: * Detected change in '/home/saipraneeth/Desktop/application/mongo.py', reloading
+2020-08-28 15:57:36,735:INFO: * Restarting with stat
+2020-08-28 15:57:37,241:WARNING: * Debugger is active!
+2020-08-28 15:57:37,243:INFO: * Debugger PIN: 314-854-231
