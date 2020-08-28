@@ -1,0 +1,34 @@
+2020-08-27 18:20:23,555:INFO: * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
+2020-08-27 18:20:23,556:INFO: * Restarting with stat
+2020-08-27 18:20:23,815:WARNING: * Debugger is active!
+2020-08-27 18:20:23,816:INFO: * Debugger PIN: 303-024-859
+2020-08-27 18:20:37,583:INFO:127.0.0.1 - - [27/Aug/2020 18:20:37] "[31m[1mPOST /addRole HTTP/1.1[0m" 400 -
+2020-08-27 18:20:48,967:INFO:127.0.0.1 - - [27/Aug/2020 18:20:48] "[31m[1mPOST /addRole HTTP/1.1[0m" 400 -
+2020-08-27 18:21:19,023:INFO:127.0.0.1 - - [27/Aug/2020 18:21:19] "[37mPOST /addRole HTTP/1.1[0m" 200 -
+2020-08-27 18:22:01,543:INFO: * Detected change in '/home/saipraneeth/Desktop/application/mongo.py', reloading
+2020-08-27 18:22:01,734:INFO: * Restarting with stat
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 303-024-859
+INFO:werkzeug: * Detected change in '/home/saipraneeth/Desktop/application/mongo.py', reloading
+2020-08-27 18:22:08,105:INFO: * Restarting with stat
+2020-08-28 13:18:49,678:INFO: * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
+2020-08-28 13:18:49,678:INFO: * Restarting with stat
+2020-08-28 13:18:49,953:WARNING: * Debugger is active!
+2020-08-28 13:18:49,956:INFO: * Debugger PIN: 314-854-231
+2020-08-28 13:20:56,827:INFO: * Detected change in '/home/saipraneeth/Desktop/application/mongo.py', reloading
+2020-08-28 13:20:56,871:INFO: * Restarting with stat
+2020-08-28 13:21:57,241:INFO: * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
+2020-08-28 13:21:57,242:INFO: * Restarting with stat
+2020-08-28 13:21:57,518:WARNING: * Debugger is active!
+2020-08-28 13:21:57,519:INFO: * Debugger PIN: 314-854-231
+2020-08-28 13:22:04,009:INFO:127.0.0.1 - - [28/Aug/2020 13:22:04] "[35m[1mPOST /login HTTP/1.1[0m" 500 -
+2020-08-28 13:22:55,984:INFO: * Detected change in '/home/saipraneeth/Desktop/application/mongo.py', reloading
+2020-08-28 13:22:56,436:INFO: * Restarting with stat
+2020-08-28 13:22:56,700:WARNING: * Debugger is active!
+2020-08-28 13:22:56,700:INFO: * Debugger PIN: 314-854-231
+2020-08-28 13:23:03,675:INFO:127.0.0.1 - - [28/Aug/2020 13:23:03] "[37mPOST /login HTTP/1.1[0m" 200 -
+2020-08-28 13:23:36,173:INFO: * Running on http://127.0.0.1:5000/ (Press CTRL+C to quit)
+2020-08-28 13:23:36,174:INFO: * Restarting with stat
+2020-08-28 13:23:36,463:WARNING: * Debugger is active!
+2020-08-28 13:23:36,464:INFO: * Debugger PIN: 314-854-231
+2020-08-28 13:23:39,424:INFO:127.0.0.1 - - [28/Aug/2020 13:23:39] "[37mPOST /login HTTP/1.1[0m" 200 -
