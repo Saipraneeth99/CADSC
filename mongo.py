@@ -1,20 +1,19 @@
-from flask import Flask,jsonify,request
+from flask import Flask,jsonify,request,redirect, url_for, session,redirect,make_response
 from flask_cors import CORS,cross_origin
 from flask_pymongo import PyMongo
 from bson.json_util import dumps
-import bcrypt
-import logging
+import bcrypt,logging
+#import logging
+from datetime import timedelta
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import (create_access_token, create_refresh_token, jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt)
 #from logging import FileHandler,WARNING,DEBUG,ERROR,INFO
 app = Flask(__name__)
+app.secret_key = "kmit123"# This will be changed
+app.permanent_session_lifetime = timedelta(minutes=15)
 jwt = JWTManager(app)
 app.config['JWT_SECRET_KEY'] = 'secret'
-'''file_handler=FileHandler('errorlog.txt')
-file_handler.setLevel(INFO)
-app.logger.addHandler(file_handler)'''
 logging.basicConfig(filename='log_flask_demo.log',level=logging.DEBUG,format = '%(asctime)s:%(levelname)s:%(message)s')
-#logging.basicConfig(filename='log_flask_demo.log',level=logging.DEBUG,format = '%(asctime)s:%(levelname)s:%(message)s')
 #CORS(app)
 app.config["MONGO_URI"] = "mongodb://localhost:27017/usersdb"
 mongo = PyMongo(app)
@@ -29,13 +28,12 @@ def add_u():
 	_name=_data['name']
 	_email=_data['email']
 	_role=_data["role"]
-	#
 	_password=_data['password']
-	_password=bcrypt.hashpw(_password.encode("utf-8"),bcrypt.gensalt())
-	existing=user_collection.find_one({"email":_email})
-	if existing is None:
+	encoded_password=bcrypt.hashpw(_password.encode("utf-8"),bcrypt.gensalt())
+	existing_user=user_collection.find_one({"email":_email})
+	if existing_user is None:
 	#if _name and _email and _password and request.method=='POST':
-		id=user_collection.insert({'name':_name, 'email': _email, 'role':_role,'password':_password})
+		id=user_collection.insert({'name':_name, 'email': _email, 'role':_role,'password':encoded_password})
 		resp=jsonify("User added succesfully")
 		resp.status_code=200
 		return resp
@@ -51,62 +49,77 @@ def not_found(error):
 	resp=jsonify(message)
 	resp.status_code=404
 	return resp
-@app.route('/login',methods=['POST'])
+@app.route('/login',methods=['POST','GET'])
 def login():
-	_data=request.json
-	_password=_data['password'].encode('utf-8')
-	user = user_collection.find_one({"email" : _data['email']})
-	database_pass=user['password']
-	if user is not None :
-		if bcrypt.hashpw(_password,database_pass):
-			access_token = create_access_token(identity = { 'name': user['name'],'email': user['email']})
-			result = jsonify({"token":access_token})
-		else:
-			result = jsonify({"error":"Invalid username and password"})
-	else :
-		result = jsonify({"result":"No results found"})
-	return result 
-'''	#if passs==_password:
-	if bcrypt.hashpw(_password,database_pass):
-	#if bcrypt.checkpw(hashed, passs): 
-		return jsonify("authrorized")
+	if request.method=='POST':
+		_data=request.json
+		_password=_data['password'].encode('utf-8')
+		user_details = user_collection.find_one({"email" : _data['email']})
+		database_password=user_details['password']
+		if user_details is not None :
+			session.permanent = True
+			session["email"]=_data['email']
+			if bcrypt.checkpw(_password,database_password):
+				access_token = create_access_token(identity = { 'name': user['name'],'email': user['email']})
+				result = jsonify({"token":access_token})
+				#result = jsonify("Authorized user")
+			else:
+				result = jsonify({"error":"Invalid username and password"})
+		else :
+			result = jsonify({"result":"No results found"})
+		return result 
 	else:
-		return jsonify("error")'''
+		if "user" in session:
+			return redirect(url_for('info'))#This is for super admin needs to get changed into dashboard when pages are created.
+		else:
+			return jsonify("Login page should be displayed")#Login page should be redirected
+
+@app.route("/logout")
+def logout():
+	session.pop("email", None)	
+	return redirect(url_for('login'))	
+
 
 @app.route('/info')
-def get_all():
+def get_users():
 	users=user_collection.find()
-	resp=dumps(users)
-	return resp
+	all_users=dumps(users)
+	return all_users
 @app.route('/addRole', methods=['POST'])
 def add_roles():
 	#req_data = request.get_json()
 	_data=request.json
 	_descrpition=_data['description']
 	_role=_data["role"]
-	if _descrpition and _role  and request.method=='POST':
-		id=role_collection.insert({'role':_role, 'description':_descrpition})
+	if _descrpition and _role:#and request.method=='POST':
+		id=role_collection.insert_one({'role':_role, 'description':_descrpition})
 		resp=jsonify("Role added succesfully")
 		resp.status_code=200
 		
 		return resp
 	else:
 		return not_found()
+@app.route('/infoRoles',methods=['GET'])
+def get_roles():
+	roles=role_collection.find()
+	all_roles=dumps(roles)
+	return all_roles
+
 @app.route('/delete/<email>',methods=['DELETE'])
 def delete_user(email):
-	user=user_collection.delete_one({'email':email})
+	user_details=user_collection.delete_one({'email':email})
 	resp =jsonify("deleted succcessfully")
 	resp.status_code=200
 	return resp
 @app.route('/update/<email>',methods=['PUT'])
 def update_user(email):
 	_data=request.json
-	user = user_collection.find_one({"email" : _data['email']})
+	user_details = user_collection.find_one({"email" : _data['email']})
 	
-	user['name']=_data['name']
+	user_details['name']=_data['name']
 	#email=_data['email']
-	user['role']=_data["role"]
-	user['password']=_data['password']
+	user_details['role']=_data["role"]
+	user_details['password']=_data['password']
 	user_collection.save(user)
 	resp=jsonify("User updated succesfully")
 	resp.status_code=200
