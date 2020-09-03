@@ -7,6 +7,7 @@ from logging.handlers import TimedRotatingFileHandler
 from datetime import timedelta
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt
+import secrets
 app = Flask(__name__)
 #app.secret_key = "kmit123"# This will be changed
 #app.config['CORS_HEADERS'] = 'Content-Type'
@@ -14,9 +15,9 @@ app.permanent_session_lifetime = timedelta(minutes=15)
 #jwt = JWTManager(app)
 #app.config['JWT_SECRET_KEY'] = 'secret' "logs/{:%H-%M}.log".format(datetime.datetime.now())
 app.config['SECRET_KEY'] = 'secret'
-logging.handlers.TimedRotatingFileHandler(filename='CADSClogs/{:%Y-%m-%d}.log'.format(datetime.datetime.now()), when='d', interval=1)#, backupCount=0, encoding=None, delay=False, utc=False, atTime=None)
+#logging.handlers.TimedRotatingFileHandler(filename='CADSClogs/CADSC{:%Y-%m-%d}.log'.format(datetime.datetime.now()), when='d', interval=1)#, backupCount=0, encoding=None, delay=False, utc=False, atTime=None)
 #logging.basicConfig(filename='log_flask_demo.log',level=logging.DEBUG,format = '%(asctime)s:%(levelname)s:%(message)s')
-logging.basicConfig(filename='CADSClogs/{:%Y-%m-%d}.log'.format(datetime.datetime.now()),level=logging.INFO,format = '%(asctime)s:%(levelname)s:%(message)s')
+logging.basicConfig(filename='CADSClogs/CADSC_{:%Y-%m-%d}.log'.format(datetime.datetime.now()),level=logging.INFO,format = '%(asctime)s:%(levelname)s:%(message)s')
 #CORS(app)
 #CORS(app, support_credentials=True)
 #CORS(app, resources=r'/*')
@@ -25,6 +26,7 @@ app.config["MONGO_URI"] = "mongodb://localhost:27017/usersdb"
 mongo = PyMongo(app)
 user_collection = mongo.db.users
 role_collection = mongo.db.roles
+session_collection=mongo.db.session
 #@cross_origin(origin='localhost',headers=['Content- Type','Authorization','Access-Control-Allow-Origin'])
 #@cross_origin(origin='localhost',allow_headers)
 #@cross_origin(origin='localhost',headers=['Content- Type','Authorization'])
@@ -45,13 +47,19 @@ def login():
 		user_details = user_collection.find_one({"email" : _data['email']})
 		database_password=user_details['password']
 		if user_details is not None :
-			session.permanent = True
-			session["email"]=_data['email']
 			if bcrypt.checkpw(_password,database_password):
+				session.permanent = True
+				_token=secrets.token_urlsafe()
+				session["token"]=_token
+				session_collection.insert_one({"token":_token})
+				logging.info(session)
 				#access_token = create_access_token(identity = { 'name': user['name'],'email': user['email']})
+				#session=eyJfcGVybWFuZW50Ijp0cnVlLCJlbWFpbCI6InRlc3QzQGdtYWlsLmNvbSJ9.X1CPxA.MD8g6c-nrJE7MulaJ5j_haxNDCU; Expires=Thu, 03-Sep-2020 06:55:04 GMT; HttpOnly; Path=/
 				#result = jsonify({"token":access_token})
-				result=jsonify({"status":"300"})
-				logging.info('User %s logged in'%_name)
+				
+				#result=jsonify({"status":"300","token":_token})
+				result=jsonify({"status":"yes","token":_token})
+				logging.info('User %s logged in'%user_collection["name"])
 				#result.status_code(200)#success
 				#result = jsonify("Authorized user")
 			else:
@@ -65,7 +73,7 @@ def login():
 		return result 
 	else:
 		if "email" in session:
-			return redirect(url_for('info'))#This is for super admin needs to get changed into dashboard when pages are created.
+			return jsonify("it is there")#redirect(url_for('info'))#This is for super admin needs to get changed into dashboard when pages are created.
 		else:
 			return jsonify({"status":"600"})#Login page should be redirected, Not authorized
 
@@ -73,17 +81,24 @@ def login():
 @app.route('/add', methods=['POST'])
 def add_u():
 	#req_data = request.get_json()
-	_data=request.json
-	if _data['email']:
-		_name=_data['name']
-		_email=_data['email']
-		_role=_data["role"]
-		_password=_data['password']
+	_data=request.get_json()
+	#temp=request.get()
+	#logging.info(temp)
+	_name=_data["name"]
+	_email=_data['email']
+	_role=_data["roles"]
+	_password=_data['password']
+	if _name and _email and _role and _password:
 		encoded_password=bcrypt.hashpw(_password.encode("utf-8"),bcrypt.gensalt())
 		existing_user=user_collection.find_one({"email":_email})
+		_new_role=[]
+		for i in _role:
+			role_details=role_collection.find_one({"role":i})
+			_new_role.append(role_details.get('_id'))
+		
 		if existing_user is None:
 		#if _name and _email and _password and request.method=='POST':
-			id=user_collection.insert_one({'name':_name, 'email': _email,'password':encoded_password ,'role':_role})
+			id=user_collection.insert_one({'name':_name, 'email': _email,'password':encoded_password ,'role':_new_role})
 			#id=user_collection.insert_one({'name':_name, 'email': _email,'password':encoded_password})
 			#resp=jsonify("User added succesfully")
 			resp=jsonify({"status":"300"})
@@ -158,36 +173,54 @@ def update_user():
 
 @app.route('/addRole', methods=['POST'])
 def add_roles():
+	_token=request.headers['authorization']
+	session_details=session_collection.find_one({"token":_token})
+	if session_details:
 	#req_data = request.get_json()
-	_data=request.json
-	_descrpition=_data['description']
-	_role=_data["role"]
-	if _descrpition and _role:#and request.method=='POST':
-		id=role_collection.insert_one({'role':_role, 'description':_descrpition})
-		resp=jsonify("Role added succesfully")
-		resp.status_code=200
-		return resp
+		_data=request.json
+		_descrpition=_data['description']
+		_role=_data["role"]
+		if _descrpition and _role:#and request.method=='POST':
+			id=role_collection.insert_one({'role':_role, 'description':_descrpition})
+			resp=jsonify({"status":"300"})#adding role successfully
+		else:
+			resp=jsonify({"status":"104"})
+		#return resp
 	else:
-		return not_found()
+		resp=jsonify({"status":"602"})
+	return resp
 @app.route('/infoRoles',methods=['GET'])
 def get_roles():
-	roles=role_collection.find()
-	all_roles=dumps(roles)
-	return all_roles
+	_token=request.headers['authorization']
+	session_details=session_collection.find_one({"token":_token})
+	if session_details:
+		roles=role_collection.find()
+		all_roles=dumps(roles)
+		return all_roles
+	else:
+		resp=jsonify({"status":"602"})
+	return resp
 
 @app.route('/updateRole',methods=['POST'])
 def update_role():
-	_data=request.json
-	if _data["description"] and _data["role"]:
+	_token=request.headers['authorization']
+	session_details=session_collection.find_one({"token":_token})
+	if session_details:
+		_data=request.json
 		role_details=role_collection.find_one({"role":_data['role']})
-		role_details['description']=_data["description"]#role name can not be updated once created.
-		role_collection.save(role_details)
-		resp=jsonify("Role updated successfully")
-		resp.status_code=200
+		#if _data["description"] and _data["role"]:
+		if role_details:
+			role_details['description']=_data["description"]#role name can not be updated once created.
+			role_collection.save(role_details)
+			resp=jsonify({"status":"305"})#updationof role
+		else:
+			resp=jsonify({"status":"106"})#irole not found in database
+			#resp.status_code() need to be mentioned
+		return resp
 	else:
-		resp=jsonify("Invalid input")
-		#resp.status_code() need to be mentioned
+		resp=jsonify({"status":"602"})
 	return resp
+
 @app.route('/deleteRole',methods=['POST'])
 def delete_role():
 	_data=request.json
@@ -195,22 +228,29 @@ def delete_role():
 	if _data["role"] and role_details:
 		existing_role=user_collection.find_one({'role':data['role']})
 		if existing_role:
+			logging.info("Tried deleting %s"%_data["role"])
 			resp=jsonify("Role assigned to more than one user, Role deletion not possible")
 			#resp.status_code=
 		else:
 			role_collection.delete_one({'role':role_details})
-			resp=jsonify("Role deleted successfully")
+			resp=jsonify({"status":"306"})
 			#resp.status_code=
 	else:
-		resp=jsonify("Invalid input")
+		resp=jsonify({"status":"107"})
 		#resp.status_code=
 	return resp
 
 
 @app.route("/logout")
 def logout():
-	session.pop("email", None)	
-	return redirect(url_for('login'))	
+	_token=request.headers['token']
+	session.pop("token", None)	
+	session_details=session_collection.find_one({"token":_token})
+	session_collection.delete_one(session_details)
+	logging.info(session)
+	resp=jsonify({"status":"601"})
+	#return redirect(url_for('login'))	
+	return resp
 
 
 
