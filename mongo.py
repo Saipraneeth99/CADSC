@@ -2,9 +2,11 @@ from flask import Flask,jsonify,request,redirect, url_for, session,redirect,make
 from flask_cors import CORS,cross_origin
 from flask_pymongo import PyMongo
 from bson.json_util import dumps
+from bson.objectid import ObjectId
 import bcrypt,logging,datetime
 from logging.handlers import TimedRotatingFileHandler
 from datetime import timedelta
+import json
 from flask_jwt_extended import JWTManager
 from flask_jwt_extended import create_access_token, create_refresh_token, jwt_required, jwt_refresh_token_required, get_jwt_identity, get_raw_jwt
 import secrets
@@ -31,7 +33,8 @@ session_collection=mongo.db.session
 #@cross_origin(origin='localhost',allow_headers)
 #@cross_origin(origin='localhost',headers=['Content- Type','Authorization'])
 cors = CORS(app, resources={r"/*": {"origins": "*"}})
-
+app.config['SECRET_KEY'] = 'abcdefgh'
+app.config['PERMANENT_SESSION_LIFETIME'] =  timedelta(minutes=30)
 @app.route('/')
 def home_page():     
 	
@@ -43,6 +46,7 @@ def home_page():
 def login():
 	if request.method=='POST':
 		_data=request.json
+		logging.info(_data)
 		_password=_data['password'].encode('utf-8')
 		user_details = user_collection.find_one({"email" : _data['email']})
 		database_password=user_details['password']
@@ -51,15 +55,16 @@ def login():
 				session.permanent = True
 				_token=secrets.token_urlsafe()
 				session["token"]=_token
-				session_collection.insert_one({"token":_token})
-				logging.info(session)
+				valid_from=datetime.datetime.now()#created_time
+				session_collection.insert_one({'token':_token,'start_time':valid_from,'end_time':valid_from+datetime.timedelta(minutes=30)})
+				logging.info(session["token"])
 				#access_token = create_access_token(identity = { 'name': user['name'],'email': user['email']})
 				#session=eyJfcGVybWFuZW50Ijp0cnVlLCJlbWFpbCI6InRlc3QzQGdtYWlsLmNvbSJ9.X1CPxA.MD8g6c-nrJE7MulaJ5j_haxNDCU; Expires=Thu, 03-Sep-2020 06:55:04 GMT; HttpOnly; Path=/
 				#result = jsonify({"token":access_token})
 				
 				#result=jsonify({"status":"300","token":_token})
-				result=jsonify({"status":"yes","token":_token})
-				logging.info('User %s logged in'%user_collection["name"])
+				result=jsonify({"status":"300","token":_token})
+				logging.info('User %s logged in'%_data["email"])
 				#result.status_code(200)#success
 				#result = jsonify("Authorized user")
 			else:
@@ -72,7 +77,7 @@ def login():
 			result=jsonify({"status":"102"})
 		return result 
 	else:
-		if "email" in session:
+		if "token" in session:
 			return jsonify("it is there")#redirect(url_for('info'))#This is for super admin needs to get changed into dashboard when pages are created.
 		else:
 			return jsonify({"status":"600"})#Login page should be redirected, Not authorized
@@ -88,13 +93,18 @@ def add_u():
 	_email=_data['email']
 	_role=_data["roles"]
 	_password=_data['password']
-	if _name and _email and _role and _password:
+	#logging.info(_role)
+	if _name and _email and _password:#_role and 
 		encoded_password=bcrypt.hashpw(_password.encode("utf-8"),bcrypt.gensalt())
 		existing_user=user_collection.find_one({"email":_email})
 		_new_role=[]
 		for i in _role:
-			role_details=role_collection.find_one({"role":i})
+		# 	
+			logging.info(i)
+			temp=i["$oid"]
+			role_details=role_collection.find_one({"_id": ObjectId(temp)})
 			_new_role.append(role_details.get('_id'))
+		# 	 logging.info(_new_role)
 		
 		if existing_user is None:
 		#if _name and _email and _password and request.method=='POST':
@@ -124,45 +134,81 @@ def not_found(error):
 	resp=jsonify(message)
 	resp.status_code=404
 	return resp'''
-
+@app.route('/infoR',methods=['POST'])
+def get_role():
+	_data=request.get_json()
+	#logging.info(_data)
+	_role=_data["roles"]
+	_new_role=[]
+	for i in _role:
+		temp=i["$oid"]
+		role_details=role_collection.find_one({"_id": ObjectId(temp)})
+		_new_role.append(role_details)
+	all_roles=dumps(_new_role)
+	return all_roles
+	
 @app.route('/info',methods=['GET'])
 def get_users():
 	#_data=request.json
 	#_email=_data["email"]
+	_token=request.headers['authorization']
+	session_details=session_collection.find_one({"token":_token}) 
+	#if session_details and _token in session['token']:
+	#if session_details is session['token']:
+	logging.info(_token)
 	users=user_collection.find()
+	
 	all_users=dumps(users)
-	return all_users
+	#all_users=json.loads(all_users)
+	#logging.info(type(all_users))
+	#all_users.join({"status":"308"})
+	#all_users.append({"status":"308"})
+	#resp=jsonify({"status":"108"})
+	return all_users 
 	
 
 @app.route('/deleteUser',methods=['DELETE'])
 def delete_user():
-	_data=request.json
-	_email=_data["email"]
-	if _email:
-		user_details=user_collection.delete_one({'email':_email})
-		resp =jsonify({"status":"301"}) # Deleted user successfully
-		#resp.status_code=200
-		logging.info("User %s Deleted Successfully"%_email)
+	_token=request.headers['authorization']
+	session_details=session_collection.find_one({"token":_token}) 
+	#if session_details and _token in session['token']:
+	if session_details is session['token']:
+		_data=request.json
+		_email=_data["email"]
+		if _email:
+			user_details=user_collection.delete_one({'email':_email})
+			resp =jsonify({"status":"301"}) # Deleted user successfully
+			#resp.status_code=200
+			logging.info("User %s Deleted Successfully"%_email)
+			return resp
+		else:
+			resp=jsonify({"status":"106"})#email expected
+			#resp.status_code() need to be mentioned
 		return resp
-	else:
-		resp=jsonify({"status":"106"})#email expected
-		#resp.status_code() need to be mentioned
-	return resp
 
-@app.route('/updateUser',methods=['PUT'])
+@app.route('/updateUser',methods=['POST'])
 def update_user():
 	_data=request.json
+	logging.info(_data)
 	_email=_data['email']
 	if _email:
 		user_details = user_collection.find_one({"email" : _email})
 		
 		user_details['name']=_data['name']
 		#email=_data['email']
-		user_details['role']=_data["role"]
-		encoded_password=bcrypt.hashpw(_data['password'].encode("utf-8"),bcrypt.gensalt())
-		user_details['password']=encoded_password
+		_role=_data["roles"]
+		#encoded_password=bcrypt.hashpw(_data['password'].encode("utf-8"),bcrypt.gensalt())
+		#user_details['password']=encoded_password
+		_new_role=[]
+		for i in _role:
+			temp=i["$oid"]
+			role_details=role_collection.find_one({"_id": ObjectId(temp)})
+			_new_role.append(role_details.get('_id'))
+			#_new_role.append(role_details.get('_id'))
+
+		user_details['role']=_new_role
 		user_collection.save(user_details)
-		rresp=jsonify({"status":"302"})#user updated
+		resp=jsonify({"status":"302"})#user updated
 		logging.info("User %s Updated Successfully"%_email)
 		#else:
 		#	return not_found()
@@ -193,13 +239,13 @@ def add_roles():
 def get_roles():
 	_token=request.headers['authorization']
 	session_details=session_collection.find_one({"token":_token})
-	if session_details:
-		roles=role_collection.find()
-		all_roles=dumps(roles)
-		return all_roles
-	else:
-		resp=jsonify({"status":"602"})
-	return resp
+	#if session_details:
+	roles=role_collection.find()
+	all_roles=dumps(roles)
+	return all_roles
+	# else:
+	# 	resp=jsonify({"status":"602"})
+	# return resp
 
 @app.route('/updateRole',methods=['POST'])
 def update_role():
@@ -224,7 +270,8 @@ def update_role():
 @app.route('/deleteRole',methods=['POST'])
 def delete_role():
 	_data=request.json
-	role_details=role_collection.find_one({"role":_data['role']})
+	_role=_data["role"]
+	role_details=role_collection.find_one({"role":_role})
 	if _data["role"] and role_details:
 		existing_role=user_collection.find_one({'role':data['role']})
 		if existing_role:
@@ -241,7 +288,7 @@ def delete_role():
 	return resp
 
 
-@app.route("/logout")
+@app.route("/signouts")
 def logout():
 	_token=request.headers['token']
 	session.pop("token", None)	
